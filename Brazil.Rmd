@@ -71,10 +71,6 @@ brazil_gdp_location <- brazil_gdp_location %>%
 brazil_city_coordinates <- brazil_city_coordinates %>% 
   mutate(city_code = as.numeric(substr(city_code, 1, 6)))
 
-#DELETE
-#brazil_gdp %>% filter(str_detect(nome,"ana"))
-#brazil_cities %>% filter(str_detect(name,"Sant'Ana"))
-
 #Cleaning the population db
 brazil_population <- brazil_population %>% 
   janitor::clean_names() %>% 
