@@ -16,6 +16,7 @@ library(skimr)
 library(vroom)
 library(stringr)
 library(openxlsx)
+library(lubridate)
 ```
 
 
@@ -28,6 +29,29 @@ brazil_city_coordinates <- vroom("data/brazil_cities_coordinates.csv")
 brazil_population <- vroom(file = "data/pop_by_city.csv")
 brazil_gdp <- vroom("data/PIB dos Munic¡pios - base de dados 2010-2017.csv")
 brazil_gdp_location <- read.xlsx(xlsxFile = "data/brazil_gdp_city.xlsx", fillMergedCells = TRUE, colNames = TRUE) 
+brazil_hospital_beds <- vroom(file = "data/Itensive_Care Beds_Brazil_2020.csv", delim=';')
+
+brazil_hospital_beds <- brazil_hospital_beds %>% 
+  janitor::clean_names() %>% 
+  mutate(x2020_jul = as.numeric(x2020_jul),
+         x2020_ago = as.numeric(x2020_ago)) %>% 
+  pivot_longer(!municipio,names_to = "date",values_to = "beds") %>% 
+  mutate(date = case_when(
+    date == "x2020_jan" ~ dmy(15012020),
+    date == "x2020_fev" ~ dmy(15022020),
+    date == "x2020_mar" ~ dmy(15032020),
+    date == "x2020_abr" ~ dmy(15042020),
+    date == "x2020_mai" ~ dmy(15052020),
+    date == "x2020_jun" ~ dmy(15062020),
+    date == "x2020_jul" ~ dmy(15072020),
+    date == "x2020_ago" ~ dmy(15082020),
+    date == "x2020_set" ~ dmy(15092020),
+    date == "x2020_out" ~ dmy(15102020)),
+    city_name = trimws(str_extract("110001 Alta Floresta D'Oeste", "\\s.*"),"l"),
+    code = as.numeric(str_extract(municipio, "(\\d{6})"))) %>% 
+  select(code, city_name, date, beds)
+  
+skim(brazil_hospital_beds)
 
 brazil_gdp_location <- brazil_gdp_location %>% 
   janitor::clean_names() %>% 
@@ -114,13 +138,20 @@ brazil_gdp <-
   #removing last digit from the city code
   mutate(city_code = as.integer(substr(city_code, 1, nchar(city_code)-1)))
 
+brazil_hospital_beds$merge_date=format(as.Date(brazil_hospital_beds$date), "%Y-%m")
+brazil_cities$merge_date=format(as.Date(brazil_cities$date), "%Y-%m")
+
+brazil_hospital_beds %>% select(-date, city_name) #remove uneccessary columns
 
 #Joining databases (coordinates and population)
 brazil_cities <- brazil_cities %>% 
   left_join(brazil_city_coordinates, by = c("code" = "city_code")) %>% 
   left_join(brazil_population,by = c("code" = "city_code")) %>% 
   left_join(brazil_gdp,by = c("code" = "city_code")) %>% 
-  left_join(brazil_gdp_location,by = c("name" = "city_name"))
+  left_join(brazil_gdp_location,by = c("name" = "city_name")) %>% 
+  left_join(brazil_hospital_beds, by = c("code", "merge_date")) %>% 
+  select(-merge_date) #Remove the date used for merging
+  
 
 #Creating daily_new_cases and cases_per_100k
 brazil_cities <- brazil_cities %>% 
@@ -146,7 +177,8 @@ brazil_cities <- brazil_cities %>%
          recovered_infections = lag(cases,14) - deaths)
 
 
-write.csv(brazil_cities,"brazil_cities_lat_long.csv")
+brazil_hospital_beds
+#write.csv(brazil_cities,"brazil_cities_lat_long.csv")
 ```
 
 ```{r}
@@ -180,5 +212,18 @@ classes_over_time <- brazil_cities %>%
 
 ggplot(classes_over_time, aes(x=date,y=avg_cases_100k)) + geom_line()
 ```
+```{r}
+daily_data <- brazil_cities %>% 
+  group_by(date) %>% 
+  summarise(recovered = sum(recovered_infections), active_cases = sum(active_infections), cum_cases = sum(cases))
+
+ggplot(daily_data, aes(x=date, y=cum_cases)) + 
+  geom_line(color="red") +
+  geom_line(aes(x=date, y=recovered),color="green")
+
+ggplot(daily_data, aes(x=date, y=active_cases)) + 
+  geom_line(color="red")
+```
+
 
 
