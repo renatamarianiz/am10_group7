@@ -163,18 +163,18 @@ brazil_cities <- brazil_cities %>%
 
 #Creating daily_new_deaths and deaths_per_100k
 brazil_cities <- brazil_cities %>% 
-  arrange(code, date) %>% 
-  group_by(code) %>% 
   mutate(daily_new_deaths = deaths - lag(deaths),
          weekly_new_deaths = deaths - lag(deaths, k=7),
          weekly_deaths_per_100k = (weekly_new_deaths / population) * 100000)
 
 #Creating daily_new_deaths and deaths_per_100k
 brazil_cities <- brazil_cities %>% 
-  arrange(code, date) %>% 
-  group_by(code) %>% 
   mutate(active_infections = cases - lag(cases,14),
          recovered_infections = lag(cases,14) - deaths)
+
+#Creating beds_per_100k
+brazil_cities <- brazil_cities %>% 
+  mutate(beds_per_100k = (beds / population * 100000))
 
 write.csv(brazil_cities,"brazil_cities_lat_long.csv")
 ```
