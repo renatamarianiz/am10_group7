@@ -141,7 +141,7 @@ brazil_gdp <-
 brazil_hospital_beds$merge_date=format(as.Date(brazil_hospital_beds$date), "%Y-%m")
 brazil_cities$merge_date=format(as.Date(brazil_cities$date), "%Y-%m")
 
-brazil_hospital_beds %>% select(-date, city_name) #remove uneccessary columns
+brazil_hospital_beds <- brazil_hospital_beds %>% select(-date, -city_name) #remove uneccessary columns
 
 #Joining databases (coordinates and population)
 brazil_cities <- brazil_cities %>% 
@@ -176,9 +176,7 @@ brazil_cities <- brazil_cities %>%
   mutate(active_infections = cases - lag(cases,14),
          recovered_infections = lag(cases,14) - deaths)
 
-
-brazil_hospital_beds
-#write.csv(brazil_cities,"brazil_cities_lat_long.csv")
+write.csv(brazil_cities,"brazil_cities_lat_long.csv")
 ```
 
 ```{r}
