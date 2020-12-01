@@ -1,0 +1,122 @@
+---
+title: "Analysis Brazil"
+author: "Jan Mölich"
+date: "11/26/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(skimr)
+library(vroom)
+library(stringr)
+library(scales)
+```
+
+
+```{r}
+
+## Importing Data
+brazil_covid19 <- vroom("data/brazil_covid19.csv")
+brazil_cities <- vroom("data/brazil_covid19_cities.csv")
+brazil_city_coordinates <- vroom("data/brazil_cities_coordinates.csv")
+brazil_population <- vroom(file = "data/pop_by_city.csv")
+brazil_gdp <- vroom("data/PIB dos Munic¡pios - base de dados 2010-2017.csv")
+brazil_city_coordinates <- brazil_city_coordinates %>% 
+  mutate(city_code = as.numeric(substr(city_code, 1, 6)))
+
+#DELETE
+#brazil_gdp %>% filter(str_detect(nome,"ana"))
+#brazil_cities %>% filter(str_detect(name,"Sant'Ana"))
+
+#Cleaning the population db
+brazil_population <- brazil_population %>% 
+  janitor::clean_names() %>% 
+  mutate(city_code = as.numeric(paste(cod_uf,substr(cod_munic, 1, 4), sep = "")), 
+         population = case_when(
+      city_code == 110020 ~ 369259,
+      TRUE  ~ sapply(populacao_estimada, function(v) {as.numeric(gsub("\\.","", as.character(v)))}))) %>% 
+  select(city_code, population)
+
+#Cleaning the GDP db
+brazil_gdp <- 
+  brazil_gdp %>% 
+  #selecting year
+  filter(Ano == 2017) %>%
+  #cleaning col names
+  janitor::clean_names() %>% 
+  #selecting columns
+  select(c(nome_da_grande_regiao,
+           codigo_do_municipio,
+           nome_do_municipio,
+           hierarquia_urbana_principais_categorias,
+           produto_interno_bruto_a_precos_correntes_r_1_000,
+           produto_interno_bruto_per_capita_a_precos_correntes_r_1_00,
+           atividade_com_maior_valor_adicionado_bruto
+           )) %>% 
+  #renaming columns
+  rename(region = nome_da_grande_regiao,
+         city_code = codigo_do_municipio,
+         city = nome_do_municipio,
+         city_type = hierarquia_urbana_principais_categorias,
+         gdp = produto_interno_bruto_a_precos_correntes_r_1_000,
+         gdp_per_capita = produto_interno_bruto_per_capita_a_precos_correntes_r_1_00,
+         main_activity = atividade_com_maior_valor_adicionado_bruto) %>% 
+  #replacing decimal and thousand separators
+  mutate(gdp = sapply(gdp, function(v) {as.numeric(gsub("\\,","", as.character(v)))}),
+         gdp_per_capita = sapply(gdp_per_capita, function(v) {as.numeric(gsub("\\,","", as.character(v)))})) %>% 
+  #removing last digit from the city code
+  mutate(city_code = as.integer(substr(city_code, 1, nchar(city_code)-1)))
+
+
+#Joining databases (coordinates and population)
+brazil_cities <- brazil_cities %>% 
+  left_join(brazil_city_coordinates, by = c("code" = "city_code")) %>% 
+  left_join(brazil_population,by = c("code" = "city_code")) %>% 
+  left_join(brazil_gdp,by = c("code" = "city_code")) %>% 
+  select(-c(city_name,city))
+
+#Creating daily_new_cases and cases_per_100k
+brazil_cities <- brazil_cities %>% 
+  arrange(code, date) %>% 
+  group_by(code) %>% 
+  mutate(daily_new_cases = cases - lag(cases),
+         cases_per_100k = (daily_new_cases / population) * 100000)
+
+#Saving as a csv
+write.csv(brazil_cities, "brazil_cities_lat_long.csv")
+```
+
+```{r}
+
+analysis_1 <- brazil_cities %>% 
+  drop_na(cases_per_100k) %>% 
+  group_by(name) %>% 
+  summarise(max_cases_per_100k = max(cases_per_100k), population = mean(population), capital = mean(capital)) %>% 
+  mutate(capital = as.logical(capital))
+
+analysis_1 %>% 
+  filter(capital == TRUE) %>% 
+  ggplot(aes(y=max_cases_per_100k, x=population, color = capital, label = name)) + geom_point() +
+  geom_text() + 
+  scale_x_log10() +
+  scale_y_log10()
+
+```
+
+
+```{r}
+
+brazil_cities %>% 
+  filter(name == "Porto Alegre") %>%
+  ggplot(aes(y = cases , x = date)) +
+  geom_line() +
+  scale_x_date(date_breaks = "months" , date_labels = "%b-%y")
+
+
+```
