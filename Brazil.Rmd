@@ -1,0 +1,177 @@
+---
+title: "Analysis Brazil"
+author: "Jan Mölich"
+date: "11/26/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(skimr)
+library(vroom)
+library(stringr)
+library(openxlsx)
+```
+
+
+```{r}
+
+## Importing Data
+brazil_covid19 <- vroom("data/brazil_covid19.csv")
+brazil_cities <- vroom("data/brazil_covid19_cities.csv")
+brazil_city_coordinates <- vroom("data/brazil_cities_coordinates.csv")
+brazil_population <- vroom(file = "data/pop_by_city.csv")
+brazil_gdp <- vroom("data/PIB dos Munic¡pios - base de dados 2010-2017.csv")
+brazil_gdp_location <- read.xlsx(xlsxFile = "data/brazil_gdp_city.xlsx", fillMergedCells = TRUE, colNames = TRUE) 
+
+brazil_gdp_location <- brazil_gdp_location %>% 
+  janitor::clean_names() %>% 
+  rename(
+    city_name = municipio,
+    class = classes_de_rendimento_nominal_mensal_domiciliar_per_capita,
+    statistic = ano_x_situacao_do_domicilio
+    ) %>% 
+  filter(class != "Total") %>% 
+  mutate(class = case_when(
+    class == "Total" ~ "Total",
+    class == "Até 1/8 de salário mínimo" ~ "below_0.125",
+    class == "Mais de 1/8 a 1/4 de salário mínimo" ~ "between_0.125_0.25",
+    class == "Mais de 1/4 a 1/2 salário mínimo" ~ "between_0.25_0.5",
+    class == "Mais de 1/2 a 1 salário mínimo" ~ "between_0.5_1",
+    class == "Mais de 1 a 2 salários mínimos" ~ "between_1_2",
+    class == "Mais de 2 a 3 salários mínimos" ~ "between_2_3",
+    class == "Mais de 3 a 5 salários mínimos" ~ "between_3_5",
+    class == "Mais de 5 a 10 salários mínimos" ~ "between_5_10",
+    class == "Mais de 10 salários mínimos" ~ "more_than_10",
+    TRUE ~ class),
+    city_name = str_remove(city_name, " \\([A-Z]{2}\\)")) %>% 
+  mutate(statistic = round(as.numeric(statistic),2)) %>% 
+  filter(class != "Sem rendimento", class != "Fonte: IBGE - Censo Demográfico") 
+  
+max_classes <- brazil_gdp_location %>% 
+  group_by(city_name) %>% 
+  arrange(desc(statistic)) %>% 
+  drop_na(statistic) %>% 
+  summarize(statistic=max(statistic))
+  
+max_classes_with_name <- max_classes  %>% 
+  left_join(brazil_gdp_location, by=c("city_name", "statistic")) %>% 
+  mutate(max_class = class) %>% 
+  select(city_name, max_class)
+  
+brazil_gdp_location <- brazil_gdp_location %>% 
+  left_join(max_classes_with_name, by="city_name") %>% 
+  pivot_wider(names_from = class, values_from = statistic,values_fn = {mean})
+
+brazil_city_coordinates <- brazil_city_coordinates %>% 
+  mutate(city_code = as.numeric(substr(city_code, 1, 6)))
+
+#DELETE
+#brazil_gdp %>% filter(str_detect(nome,"ana"))
+#brazil_cities %>% filter(str_detect(name,"Sant'Ana"))
+
+#Cleaning the population db
+brazil_population <- brazil_population %>% 
+  janitor::clean_names() %>% 
+  mutate(city_code = as.numeric(paste(cod_uf,substr(cod_munic, 1, 4), sep = "")), 
+         population = case_when(
+      city_code == 110020 ~ 369259,
+      TRUE  ~ sapply(populacao_estimada, function(v) {as.numeric(gsub("\\.","", as.character(v)))}))) %>% 
+  select(city_code, population)
+
+#Cleaning the GDP db
+brazil_gdp <- 
+  brazil_gdp %>% 
+  #selecting year
+  filter(Ano == 2017) %>%
+  #cleaning col names
+  janitor::clean_names() %>% 
+  #selecting columns
+  select(c(nome_da_grande_regiao,
+           codigo_do_municipio,
+           nome_do_municipio,
+           hierarquia_urbana_principais_categorias,
+           produto_interno_bruto_a_precos_correntes_r_1_000,
+           produto_interno_bruto_per_capita_a_precos_correntes_r_1_00,
+           atividade_com_maior_valor_adicionado_bruto
+           )) %>% 
+  #renaming columns
+  rename(region = nome_da_grande_regiao,
+         city_code = codigo_do_municipio,
+         city = nome_do_municipio,
+         city_type = hierarquia_urbana_principais_categorias,
+         gdp = produto_interno_bruto_a_precos_correntes_r_1_000,
+         gdp_per_capita = produto_interno_bruto_per_capita_a_precos_correntes_r_1_00,
+         main_activity = atividade_com_maior_valor_adicionado_bruto) %>% 
+  #replacing decimal and thousand separators
+  mutate(gdp = sapply(gdp, function(v) {as.numeric(gsub("\\,","", as.character(v)))}),
+         gdp_per_capita = sapply(gdp_per_capita, function(v) {as.numeric(gsub("\\,","", as.character(v)))})) %>% 
+  #removing last digit from the city code
+  mutate(city_code = as.integer(substr(city_code, 1, nchar(city_code)-1)))
+
+
+#Joining databases (coordinates and population)
+brazil_cities <- brazil_cities %>% 
+  left_join(brazil_city_coordinates, by = c("code" = "city_code")) %>% 
+  left_join(brazil_population,by = c("code" = "city_code")) %>% 
+  left_join(brazil_gdp,by = c("code" = "city_code")) %>% 
+  left_join(brazil_gdp_location,by = c("name" = "city_name"))
+
+#Creating daily_new_cases and cases_per_100k
+brazil_cities <- brazil_cities %>% 
+  arrange(code, date) %>% 
+  group_by(code) %>% 
+  mutate(daily_new_cases = cases - lag(cases),
+         weekly_new_cases = cases - lag(cases, k=7),
+         weekly_cases_per_100k = (weekly_new_cases / population) * 100000)
+
+#Creating daily_new_deaths and deaths_per_100k
+brazil_cities <- brazil_cities %>% 
+  arrange(code, date) %>% 
+  group_by(code) %>% 
+  mutate(daily_new_deaths = deaths - lag(deaths),
+         weekly_new_deaths = deaths - lag(deaths, k=7),
+         weekly_deaths_per_100k = (weekly_new_deaths / population) * 100000)
+
+
+write.csv(brazil_cities,"brazil_cities_lat_long.csv")
+```
+
+```{r}
+
+analysis_1 <- brazil_cities %>% 
+  drop_na(cases_per_100k) %>% 
+  group_by(name) %>% 
+  summarise(max_cases_per_100k = max(cases_per_100k), population = mean(population), capital = mean(capital)) %>% 
+  mutate(capital = as.logical(capital))
+
+analysis_1 %>% 
+  filter(capital == TRUE) %>% 
+  ggplot(aes(y=max_cases_per_100k, x=population, color = capital, label = name)) + geom_point() +
+  geom_text() + 
+  scale_x_log10() +
+  scale_y_log10()
+```
+
+```{r}
+library(zoo)
+ggplot(brazil_cities) + geom_boxplot(aes(x=max_class, y=cases_per_100k), alpha=0.02)
+
+classes_over_time <- brazil_cities %>% 
+  drop_na(cases_per_100k, max_class) %>% 
+  select(max_class, cases_per_100k, date) %>% 
+  group_by(date, max_class) %>% 
+  summarise(avg_cases_100k = mean(cases_per_100k)) %>% 
+  mutate(roll_mean_cases_100k = rollmean(avg_cases_100k, k=6, na.pad = T))
+  
+  
+
+ggplot(classes_over_time, aes(x=date,y=avg_cases_100k)) + geom_line()
+```
+
+
