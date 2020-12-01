@@ -142,15 +142,15 @@ brazil_cities <- brazil_cities %>%
          recovered_infections = lag(cases,14) - deaths)
 
 
-write.csv(brazil_cities,"brazil_cities_lat_long.csv")
+#write.csv(brazil_cities,"brazil_cities_lat_long.csv")
 ```
 
 ```{r}
 
 analysis_1 <- brazil_cities %>% 
-  drop_na(cases_per_100k) %>% 
+  drop_na(weekly_cases_per_100k) %>% 
   group_by(name) %>% 
-  summarise(max_cases_per_100k = max(cases_per_100k), population = mean(population), capital = mean(capital)) %>% 
+  summarise(max_cases_per_100k = max(weekly_cases_per_100k), population = mean(population), capital = mean(capital)) %>% 
   mutate(capital = as.logical(capital))
 
 analysis_1 %>% 
@@ -163,13 +163,13 @@ analysis_1 %>%
 
 ```{r}
 library(zoo)
-ggplot(brazil_cities) + geom_boxplot(aes(x=max_class, y=cases_per_100k), alpha=0.02)
+ggplot(brazil_cities) + geom_boxplot(aes(x=max_class, y=weekly_cases_per_100k), alpha=0.02)
 
 classes_over_time <- brazil_cities %>% 
-  drop_na(cases_per_100k, max_class) %>% 
-  select(max_class, cases_per_100k, date) %>% 
+  drop_na(weekly_cases_per_100k, max_class) %>% 
+  select(max_class, weekly_cases_per_100k, date) %>% 
   group_by(date, max_class) %>% 
-  summarise(avg_cases_100k = mean(cases_per_100k)) %>% 
+  summarise(avg_cases_100k = mean(weekly_cases_per_100k)) %>% 
   mutate(roll_mean_cases_100k = rollmean(avg_cases_100k, k=6, na.pad = T))
   
   
