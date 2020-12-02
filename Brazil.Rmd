@@ -152,7 +152,7 @@ brazil_population <- brazil_population %>%
 
 
 ```{r}
-#Cleaning the GDP db
+#Cleaning the GDP dataframe
 brazil_gdp <- 
   brazil_gdp %>% 
   #selecting year
@@ -184,20 +184,31 @@ brazil_gdp <-
 ```
 
 ```{r}
+#Joning dataframes
+
+#Formating date columns that will be used as merge criteria
 brazil_hospital_beds$merge_date=format(as.Date(brazil_hospital_beds$date), "%Y-%m")
 brazil_cities$merge_date=format(as.Date(brazil_cities$date), "%Y-%m")
 
-brazil_hospital_beds <- brazil_hospital_beds %>% select(-date, -city_name) #remove uneccessary columns
+#Remove uneccessary columns
+brazil_hospital_beds <- brazil_hospital_beds %>% select(-date, -city_name)
 
-#Joining databases (coordinates and population)
-brazil_cities <- brazil_cities %>% 
+#Joining all cleaned databases
+brazil_cities <- 
+  brazil_cities %>% 
   left_join(brazil_city_coordinates, by = c("code" = "city_code")) %>% 
   left_join(brazil_population,by = c("code" = "city_code")) %>% 
   left_join(brazil_gdp,by = c("code" = "city_code")) %>% 
   left_join(brazil_gdp_location,by = c("name" = "city_name")) %>% 
   left_join(brazil_hospital_beds, by = c("code", "merge_date")) %>% 
   select(-merge_date) #Remove the date used for merging
-  
+
+
+```
+
+```{r}
+
+#Creating and mutating new variables
 
 #Creating daily_new_cases and cases_per_100k
 brazil_cities <- brazil_cities %>% 
@@ -242,11 +253,16 @@ brazil_cities <- brazil_cities %>%
 brazil_cities <- brazil_cities %>%
   group_by(code, date) %>% 
   mutate(icu_capacity = (active_infections * 0.05)/beds)
-
-
-
-write.csv(brazil_cities,"brazil_cities_lat_long.csv")
 ```
+
+```{r}
+
+#Saving it in a CSV that will be used in Tableau for the visualizations
+write.csv(brazil_cities,"brazil_cities_lat_long.csv")
+
+```
+
+
 
 
 ```{r}
