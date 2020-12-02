@@ -173,7 +173,7 @@ write.csv(brazil_cities,"brazil_cities_lat_long.csv")
 brazil_cities <- brazil_cities %>% mutate(daily_new_cases = ifelse(is.na(daily_new_cases),0 , daily_new_cases))
 
 
-
+#Creating vraibles about region: daily_cases / cumsum(cases) / days_since 10000 cases
 brazil_cities_region <- brazil_cities %>%
   arrange(region, date) %>% 
   group_by(region,date) %>%
@@ -182,6 +182,7 @@ brazil_cities_region <- brazil_cities %>%
   mutate(region_days_since_10000_cases = ifelse (cumsum_region < 10000,0,1))%>% 
   mutate(region_days_since_10000_cases = ifelse (cumsum_region< 10000,0, cumsum(region_days_since_10000_cases) )) 
 
+#Creating variables by city type
 brazil_cities_type <- brazil_cities %>%
   arrange(city_type, date) %>% 
   group_by(city_type,date) %>%
@@ -190,6 +191,7 @@ brazil_cities_type <- brazil_cities %>%
   mutate(city_type_days_since_10000_cases = ifelse (cumsum_city_type < 10000,0,1))%>% 
   mutate(city_type_days_since_10000_cases = ifelse (cumsum_city_type< 10000,0, cumsum(city_type_days_since_10000_cases) )) 
 
+#Creating variable by states
 brazil_cities_states <- brazil_cities %>%
   arrange(state, date) %>% 
   group_by(state,date) %>%
@@ -204,7 +206,7 @@ brazil_cities <- brazil_cities %>% mutate(population = ifelse(is.na(daily_new_ca
 brazil_cities_gdp <- brazil_cities
 
 
-
+#Categorizing gdp
 brazil_cities_gdp <- brazil_cities_gdp %>% 
   mutate(gdp_group = case_when(
     gdp_per_capita <= 10000 ~ 1,
@@ -214,7 +216,7 @@ brazil_cities_gdp <- brazil_cities_gdp %>%
     gdp_per_capita >= 40000 ~ 5
   ))
 
-
+#Creating variables by gdp
 brazil_cities_gdp <- brazil_cities_gdp %>%
   arrange(gdp_group, date) %>% 
   group_by(gdp_group,date) %>%
@@ -224,8 +226,7 @@ brazil_cities_gdp <- brazil_cities_gdp %>%
   mutate(gdp_days_since_10000_cases = ifelse (cumsum_gdp< 10000,0, cumsum(gdp_days_since_10000_cases) ))
 
 
-
-
+#Creating csv for tableau
 write.csv(brazil_cities_region,"brazil_cities_region.csv")
 write.csv(brazil_cities_states,"brazil_cities_states.csv")
 write.csv(brazil_cities_type, "brazil_cities_type.csv")
@@ -237,9 +238,30 @@ write.csv(brazil_cities_gdp, "brazil_cities_gdp.csv")
 ```
 
 
+
+
+
 ```{r}
 
-#Joining databases (coordinates and population)
+# Quick visualistaions 
+ggplot(brazil_cities_region, aes(x= region_days_since_10000_cases, y= cumsum_region, color=region))+ geom_point()+ labs(title = "Spreading of COVID19 by region")
+
+ggplot(brazil_cities_type, aes(x= city_type_days_since_10000_cases, y= cumsum_city_type, color=city_type))+ geom_point() +labs(title = "Spreading of COVID19 by city_type")
+
+ggplot(brazil_cities_states, aes(x= states_days_since_10000_cases, y= cumsum_states, color=state))+ geom_point() +labs(title = "Spreading of COVID19 by states")
+
+
+ggplot(brazil_cities_gdp, aes(x= gdp_days_since_10000_cases, y= cumsum_gdp, color=gdp_group))+ geom_point()+labs(title = "Spreading of COVID19 by gdp")
+
+
+
+```
+
+```{r}
+##Regression
+
+#joining database in order to use some variable for the regression
+
 brazil_cities_2 <- brazil_cities %>% 
   left_join(brazil_cities_region, by = c("region" = "region", "date"="date")) %>% 
   left_join(brazil_cities_type,by = c("city_type" = "city_type","date"="date")) %>% 
@@ -247,34 +269,21 @@ brazil_cities_2 <- brazil_cities %>%
 
 
   view(brazil_cities_2)
-```
 
-
-
-```{r}
-ggplot(brazil_cities_region, aes(x= region_days_since_10000_cases, y= cumsum_region, color=region))+ geom_point()
-
-ggplot(brazil_cities_type, aes(x= city_type_days_since_10000_cases, y= cumsum_city_type, color=city_type))+ geom_point()
-
-ggplot(brazil_cities_states, aes(x= states_days_since_10000_cases, y= cumsum_states, color=state))+ geom_point()
-
-ggplot(brazil_cities_gdp, aes(x= gdp_days_since_10000_cases, y= cumsum_gdp, color=gdp_group))+ geom_point()
-
-
-```
-
-```{r}
-
-##Regression
-
-#correlation
+#First model
 brazil_new_cases <- brazil_cities_2
 
 
 brazil_new_cases_1 <- brazil_new_cases %>%  lm(daily_new_cases ~ region + gdp_per_capita + region_days_since_10000_cases + city_type_days_since_10000_cases + city_type + states_days_since_10000_cases + population , data = brazil_new_cases)
 
-brazil_new_cases %>% tidy(conf.int=TRUE) 
+brazil_new_cases_1 %>% tidy(conf.int=TRUE) 
 
+#Second model / not optimal as we are creating value for variables in order to predict the daily_new_cases
+brazil_new_cases_2 <- brazil_cities_2
+
+brazil_new_cases_2 <- brazil_new_cases %>%  lm(daily_new_cases ~ region + gdp_per_capita + region_days_since_10000_cases + city_type_days_since_10000_cases + city_type + states_days_since_10000_cases + population + deaths + cases + weekly_cases_per_100k + weekly_deaths_per_100k, data = brazil_new_cases)
+
+brazil_new_cases_2 %>% tidy(conf.int=TRUE)
 
 
 
