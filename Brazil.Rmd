@@ -1,7 +1,7 @@
 ---
 title: "Analysis Brazil"
-author: "Jan Mölich"
-date: "11/26/2020"
+author: "Group 7"
+date: "12/02/2020"
 output: html_document
 ---
 
@@ -263,15 +263,15 @@ write.csv(brazil_cities,"brazil_cities_lat_long.csv")
 ```
 
 
-
-
 ```{r}
 
+#Replacing NA's by 0 in the previous df
 brazil_cities <- brazil_cities %>% mutate(daily_new_cases = ifelse(is.na(daily_new_cases),0 , daily_new_cases))
+brazil_cities <- brazil_cities %>% mutate(population = ifelse(is.na(daily_new_cases), 0 , population))
 
-
-
-brazil_cities_region <- brazil_cities %>%
+#Creating new df per region (5 regions in Brazil)
+brazil_cities_region <- 
+  brazil_cities %>%
   arrange(region, date) %>% 
   group_by(region,date) %>%
   summarise(daily_cases_region= sum(daily_new_cases)) %>% 
@@ -279,6 +279,7 @@ brazil_cities_region <- brazil_cities %>%
   mutate(region_days_since_10000_cases = ifelse (cumsum < 10000,0,1))%>% 
   mutate(region_days_since_10000_cases = ifelse (cumsum< 10000,0, cumsum(region_days_since_10000_cases) )) 
 
+#Creating new df per type of city (summarising information per city type)
 brazil_cities_type <- brazil_cities %>%
   arrange(city_type, date) %>% 
   group_by(city_type,date) %>%
@@ -287,6 +288,7 @@ brazil_cities_type <- brazil_cities %>%
   mutate(region_days_since_10000_cases = ifelse (cumsum < 10000,0,1))%>% 
   mutate(region_days_since_10000_cases = ifelse (cumsum< 10000,0, cumsum(region_days_since_10000_cases) )) 
 
+#Creating new df per state (summarising by state)
 brazil_cities_states <- brazil_cities %>%
   arrange(state, date) %>% 
   group_by(state,date) %>%
@@ -296,11 +298,8 @@ brazil_cities_states <- brazil_cities %>%
   mutate(region_days_since_10000_cases = ifelse (cumsum< 10000,0, cumsum(region_days_since_10000_cases) ))
  
 
-brazil_cities <- brazil_cities %>% mutate(population = ifelse(is.na(daily_new_cases), 0 , population))
-
+#Creating new df for the GDP - creating new column to classify the GDP per Capita
 brazil_cities_gdp <- brazil_cities
-
-
 
 brazil_cities_gdp <- brazil_cities_gdp %>% 
   mutate(gdp_group = case_when(
@@ -313,6 +312,7 @@ brazil_cities_gdp <- brazil_cities_gdp %>%
 
 brazil_cities_gdp_2 <- brazil_cities_gdp
 
+#Creating new df and grouping by gdp group
 brazil_cities_gdp <- brazil_cities_gdp %>%
   arrange(gdp_group, date) %>% 
   group_by(gdp_group,date) %>%
@@ -322,6 +322,7 @@ brazil_cities_gdp <- brazil_cities_gdp %>%
   mutate(region_days_since_10000_cases = ifelse (cumsum< 10000,0, cumsum(region_days_since_10000_cases) ))
 
 
+#Creating new df and grouping by gdp group - cases per population
 brazil_cities_gdp_2 <- brazil_cities_gdp_2 %>%
   arrange(gdp_group, date) %>% 
   group_by(gdp_group,date) %>%
@@ -331,53 +332,9 @@ brazil_cities_gdp_2 <- brazil_cities_gdp_2 %>%
   mutate(region_days_since_10000_cases = ifelse (cumsum < 10000,0,1))%>% 
   mutate(region_days_since_10000_cases = ifelse (cumsum< 10000,0, cumsum(region_days_since_10000_cases) ))
 
-
+#Saving all new dfs into csv's so it is possible to import to tableau
 write.csv(brazil_cities_region,"brazil_cities_region.csv")
 write.csv(brazil_cities_states,"brazil_cities_states.csv")
 write.csv(brazil_cities_type, "brazil_cities_type.csv")
 write.csv(brazil_cities_gdp, "brazil_cities_gdp.csv")
- 
-
-```
-
-```{r}
-ggplot(brazil_cities_region, aes(x= region_days_since_10000_cases, y= cumsum, color=region))+ geom_point()
-
-ggplot(brazil_cities_type, aes(x= region_days_since_10000_cases, y= cumsum, color=city_type))+ geom_point()
-
-ggplot(brazil_cities_states, aes(x= region_days_since_10000_cases, y= cumsum, color=state))+ geom_point()
-
-ggplot(brazil_cities_gdp, aes(x= region_days_since_10000_cases, y= cumsum, color=gdp_group))+ geom_point()
-
-
-ggplot(brazil_cities_gdp_2, aes(x= region_days_since_10000_cases, y= cumsum_by_m, color=gdp_group))+ geom_point()
-
-```
-
-```{r}
-
-
-
-analysis_1 %>% 
-  filter(capital == TRUE) %>% 
-  ggplot(aes(y=max_cases_per_100k, x=population, color = capital, label = name)) + geom_point() +
-  geom_text() + 
-  scale_x_log10() +
-  scale_y_log10()
-```
-
-```{r}
-library(zoo)
-ggplot(brazil_cities) + geom_boxplot(aes(x=max_class, y=cases_per_100k), alpha=0.02)
-
-classes_over_time <- brazil_cities %>% 
-  drop_na(cases_per_100k, max_class) %>% 
-  select(max_class, cases_per_100k, date) %>% 
-  group_by(date, max_class) %>% 
-  summarise(avg_cases_100k = mean(cases_per_100k)) %>% 
-  mutate(roll_mean_cases_100k = rollmean(avg_cases_100k, k=6, na.pad = T))
-  
-  
-
-ggplot(classes_over_time, aes(x=date,y=avg_cases_100k)) + geom_line()
 ```
