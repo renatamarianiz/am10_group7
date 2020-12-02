@@ -128,20 +128,30 @@ brazil_gdp_location <-
 ```{r}
 
 #Cleaning the city coordinates file - fixing the city codes
-brazil_city_coordinates <- brazil_city_coordinates %>% 
+brazil_city_coordinates <- 
+  brazil_city_coordinates %>% 
   mutate(city_code = as.numeric(substr(city_code, 1, 6)))
 
+```
 
 
+```{r}
 #Cleaning the population db
 brazil_population <- brazil_population %>% 
+  #cleaning names
   janitor::clean_names() %>% 
+  #mutating and fixing the city code to match others
   mutate(city_code = as.numeric(paste(cod_uf,substr(cod_munic, 1, 4), sep = "")), 
+         #fixing the thousands separators in the population column
          population = case_when(
-      city_code == 110020 ~ 369259,
-      TRUE  ~ sapply(populacao_estimada, function(v) {as.numeric(gsub("\\.","", as.character(v)))}))) %>% 
+           city_code == 110020 ~ 369259,
+           TRUE  ~ sapply(populacao_estimada, function(v) {as.numeric(gsub("\\.","", as.character(v)))}))) %>% 
+  #selecting wished columns
   select(city_code, population)
+```
 
+
+```{r}
 #Cleaning the GDP db
 brazil_gdp <- 
   brazil_gdp %>% 
@@ -171,7 +181,9 @@ brazil_gdp <-
          gdp_per_capita = sapply(gdp_per_capita, function(v) {as.numeric(gsub("\\,","", as.character(v)))})) %>% 
   #removing last digit from the city code
   mutate(city_code = as.integer(substr(city_code, 1, nchar(city_code)-1)))
+```
 
+```{r}
 brazil_hospital_beds$merge_date=format(as.Date(brazil_hospital_beds$date), "%Y-%m")
 brazil_cities$merge_date=format(as.Date(brazil_cities$date), "%Y-%m")
 
