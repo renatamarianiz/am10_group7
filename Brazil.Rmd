@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
+#Importing Libraries
 library(tidyverse)
 library(dplyr)
 library(skimr)
@@ -26,15 +27,17 @@ library(data.table)
 ```{r}
 
 ## Importing Data
-brazil_covid19 <- vroom("data/brazil_covid19.csv")
-brazil_cities <- vroom("data/brazil_covid19_cities.csv")
-brazil_city_coordinates <- vroom("data/brazil_cities_coordinates.csv")
-brazil_population <- vroom(file = "data/pop_by_city.csv")
-brazil_gdp <- vroom("data/PIB dos Munic¡pios - base de dados 2010-2017.csv")
-brazil_gdp_location <- read.xlsx(xlsxFile = "data/brazil_gdp_city.xlsx", fillMergedCells = TRUE, colNames = TRUE) 
-brazil_hospital_beds <- vroom(file = "data/Itensive_Care Beds_Brazil_2020.csv",
-                                    delim=';')
+brazil_covid19 <- vroom("data/brazil_covid19.csv") #Covid Information
+brazil_cities <- vroom("data/brazil_covid19_cities.csv") #City Information
+brazil_city_coordinates <- vroom("data/brazil_cities_coordinates.csv") #City Coordinates
+brazil_population <- vroom(file = "data/pop_by_city.csv") #Population Information
+brazil_gdp <- vroom("data/PIB dos Munic¡pios - base de dados 2010-2017.csv") #GDP Information
+brazil_gdp_location <- read.xlsx(xlsxFile = "data/brazil_gdp_city.xlsx", fillMergedCells = TRUE, colNames = TRUE) #Income info
+brazil_hospital_beds <- vroom(file = "data/Itensive_Care Beds_Brazil_2020.csv", delim=';') #Number of hospital beds
 
+```
+
+```{r}
 brazil_hospital_beds <- brazil_hospital_beds %>% 
   janitor::clean_names() %>% 
   mutate(x2020_jul = as.numeric(x2020_jul),
