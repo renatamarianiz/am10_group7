@@ -21,6 +21,21 @@ library(lubridate)
 library(tidyverse)
 library(Publish)
 library(data.table)
+if(!is.element("tidyverse", installed.packages()[,1]))
+{  install.packages("tidyverse")}
+if(!is.element("cluster", installed.packages()[,1]))
+{  install.packages("cluster")}
+if(!is.element("factoextra", installed.packages()[,1]))
+{  install.packages("factoextra")}
+if(!is.element("Hmisc", installed.packages()[,1]))
+{  install.packages("Hmisc")}
+
+require(tidyverse)
+require(Hmisc)
+require(digest)
+require(cluster)    # clustering algorithms
+require(factoextra) # an umbrealla library for clustering algorithms & visualizations
+library(sf)
 ```
 
 
@@ -281,5 +296,94 @@ brazil_cities_states <- brazil_cities %>%
 
 #Saving all new dfs into csv's so it is possible to import to tableau
 write.csv(brazil_cities_states,"brazil_cities_states.csv")
+
+```
+
+# Cluster Analysis
+```{r}
+brazil_cities <- vroom("/Users/remzanella/Desktop/brazil_cities_lat_long.csv")
+
+#linear regression analysis 
+#we'll use the latest day of cases data to predict the future cases, if not we couldn't run a clustering analysis, it says that "vector size is 14.6G.
+filtered_data <- 
+  brazil_cities %>%
+  filter(date == mdy("11/25/2020")) %>% 
+  filter(daily_new_cases!=0 & daily_mortality_rate!=0 & daily_new_deaths!=0 )
+
+cluster_data <- 
+  filtered_data %>% 
+  select(daily_new_cases,daily_new_deaths,population,gdp, daily_mortality_rate) %>%
+  drop_na() %>% 
+  scale()
+
+# we'll use elbow method to find the best number of cluster 
+
+tot_withinss <- map_dbl(1:10,  function(k){
+  model <- kmeans(x = cluster_data, centers = k,iter.max = 100, nstart = 10)
+  model$tot.withinss})
+
+# Generate a data frame containing both k and tot_withinss
+elbow_df <- data.frame(
+  k = 1:10 ,
+  tot_withinss = tot_withinss
+)
+
+# Plot the elbow plot
+ggplot(elbow_df, aes(x = k, y = tot_withinss)) +
+  geom_line() +
+  scale_x_continuous(breaks = 1:20)
+
+#Here is a short way of producing the elbow chart using "fviz_nbclust" function. 
+fviz_nbclust(cluster_data,kmeans, method = "wss")+
+  labs(subtitle = "Elbow method")
+
+# from the plot below we decide to use 4 clusters 
+
+```
+
+```{r}
+
+model_km <- eclust(cluster_data, "kmeans", k = 4,nstart = 50, graph = FALSE)
+
+#Check the sizes of the clusters
+model_km$size
+
+xa<-data.frame(cluster=as.factor(c(1:4)),model_km$centers)
+xa2k3<-xa %>% gather(variable,value,-cluster,factor_key = TRUE)
+
+graphknn<-ggplot(xa2k3, aes(x = variable, y = value))+  geom_line(aes(color =cluster,group = cluster), linetype = "dashed",size=1)+ geom_point(size=1,shape=4)+geom_hline(yintercept=0)+theme(text = element_text(size=10),
+        axis.text.x = element_text(angle=45, hjust=1),legend.title=element_text(size=5),legend.text = element_text(size=5))+ggtitle("K-means Centers k=4")
+
+
+graphknn
+
+
+```
+
+
+```{r}
+# eclust function (part of factoextra) makes it easier to visuliaze clustering results
+model_km2 <- eclust(cluster_data, "kmeans", k = 2,nstart = 50, graph = FALSE)
+model_km2$size
+model_km3 <- eclust(cluster_data, "kmeans", k = 3,nstart = 50, graph = FALSE)
+model_km3$size
+model_km4 <- eclust(cluster_data, "kmeans", k = 4,nstart = 50, graph = FALSE)
+model_km4$size
+ 
+# plots to compare
+#I use the fviz_cluster function which is part of the`factoextra` library
+p1 <- fviz_cluster(model_km2, geom = "point", data = cluster_data) + ggtitle("k = 2")
+p2 <- fviz_cluster(model_km3, geom = "point",  data = cluster_data) + ggtitle("k = 3")
+p3 <- fviz_cluster(model_km4, geom = "point",  data = cluster_data) + ggtitle("k = 4")
+
+library(gridExtra)
+grid.arrange(p1, p2,p3, nrow = 2)
+```
+
+```{r}
+
+filtered_data$Cluster <- model_km4$cluster
+
+write.csv(filtered_data,"/Users/remzanella/Desktop/cluster_test.csv")
 
 ```
