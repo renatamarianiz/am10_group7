@@ -38,11 +38,17 @@ brazil_hospital_beds <- vroom(file = "data/Itensive_Care Beds_Brazil_2020.csv", 
 ```
 
 ```{r}
-brazil_hospital_beds <- brazil_hospital_beds %>% 
+#Cleaning the hospital beds (intensive care) dataframe
+brazil_hospital_beds <- 
+  brazil_hospital_beds %>% 
+  #cleaning column names
   janitor::clean_names() %>% 
+  #transforming date as numeric
   mutate(x2020_jul = as.numeric(x2020_jul),
          x2020_ago = as.numeric(x2020_ago)) %>% 
+  #pivoting the dataframe
   pivot_longer(!municipio,names_to = "date",values_to = "beds") %>% 
+  #mutating the dates - transforming to a date
   mutate(date = case_when(
     date == "x2020_jan" ~ dmy(15012020),
     date == "x2020_fev" ~ dmy(15022020),
@@ -54,19 +60,30 @@ brazil_hospital_beds <- brazil_hospital_beds %>%
     date == "x2020_ago" ~ dmy(15082020),
     date == "x2020_set" ~ dmy(15092020),
     date == "x2020_out" ~ dmy(15102020)),
+    #Fixing the city name for Alta Floresta D'Oeste
     city_name = trimws(str_extract("110001 Alta Floresta D'Oeste", "\\s.*"),"l"),
+    #Fix code
     code = as.numeric(str_extract(municipio, "(\\d{6})"))) %>% 
+  #Selecting the Columns that we want
   select(code, city_name, date, beds)
-  
-skim(brazil_hospital_beds)
 
+#checking if everything was performed
+skim(brazil_hospital_beds)
+```
+
+
+```{r}
+#cleaning income dataframe
 brazil_gdp_location <- brazil_gdp_location %>% 
+  #cleaning column names
   janitor::clean_names() %>% 
+  #renaming columns
   rename(
     city_name = municipio,
     class = classes_de_rendimento_nominal_mensal_domiciliar_per_capita,
     statistic = ano_x_situacao_do_domicilio
     ) %>% 
+  #filtering and mutating income classes (compared to the base salary in Brazil)
   filter(class != "Total") %>% 
   mutate(class = case_when(
     class == "Total" ~ "Total",
@@ -80,31 +97,41 @@ brazil_gdp_location <- brazil_gdp_location %>%
     class == "Mais de 5 a 10 salários mínimos" ~ "between_5_10",
     class == "Mais de 10 salários mínimos" ~ "more_than_10",
     TRUE ~ class),
+    #Fixing the city names
     city_name = str_remove(city_name, " \\([A-Z]{2}\\)")) %>% 
   mutate(statistic = round(as.numeric(statistic),2)) %>% 
+  #taking out the class with no income
   filter(class != "Sem rendimento", class != "Fonte: IBGE - Censo Demográfico") 
-  
-max_classes <- brazil_gdp_location %>% 
+
+#dataframe with the biggest income class per city (income class in %)
+max_classes <- 
+  brazil_gdp_location %>% 
   group_by(city_name) %>% 
   arrange(desc(statistic)) %>% 
   drop_na(statistic) %>% 
   summarize(statistic=max(statistic))
-  
+
+#Adding the city name to the previous df
 max_classes_with_name <- max_classes  %>% 
   left_join(brazil_gdp_location, by=c("city_name", "statistic")) %>% 
   mutate(max_class = class) %>% 
   select(city_name, max_class)
   
-brazil_gdp_location <- brazil_gdp_location %>% 
+#Adding previous information to our main dataframe
+brazil_gdp_location <- 
+  brazil_gdp_location %>% 
   left_join(max_classes_with_name, by="city_name") %>% 
   pivot_wider(names_from = class, values_from = statistic,values_fn = {mean})
 
+```
+
+```{r}
+
+#Cleaning the city coordinates file - fixing the city codes
 brazil_city_coordinates <- brazil_city_coordinates %>% 
   mutate(city_code = as.numeric(substr(city_code, 1, 6)))
 
-#DELETE
-#brazil_gdp %>% filter(str_detect(nome,"ana"))
-#brazil_cities %>% filter(str_detect(name,"Sant'Ana"))
+
 
 #Cleaning the population db
 brazil_population <- brazil_population %>% 
