@@ -16,6 +16,7 @@ library(skimr)
 library(vroom)
 library(stringr)
 library(openxlsx)
+library(lubridate)
 ```
 
 
@@ -28,6 +29,29 @@ brazil_city_coordinates <- vroom("data/brazil_cities_coordinates.csv")
 brazil_population <- vroom(file = "data/pop_by_city.csv")
 brazil_gdp <- vroom("data/PIB dos Munic¡pios - base de dados 2010-2017.csv")
 brazil_gdp_location <- read.xlsx(xlsxFile = "data/brazil_gdp_city.xlsx", fillMergedCells = TRUE, colNames = TRUE) 
+brazil_hospital_beds <- vroom(file = "data/Itensive_Care Beds_Brazil_2020.csv", delim=';')
+
+brazil_hospital_beds <- brazil_hospital_beds %>% 
+  janitor::clean_names() %>% 
+  mutate(x2020_jul = as.numeric(x2020_jul),
+         x2020_ago = as.numeric(x2020_ago)) %>% 
+  pivot_longer(!municipio,names_to = "date",values_to = "beds") %>% 
+  mutate(date = case_when(
+    date == "x2020_jan" ~ dmy(15012020),
+    date == "x2020_fev" ~ dmy(15022020),
+    date == "x2020_mar" ~ dmy(15032020),
+    date == "x2020_abr" ~ dmy(15042020),
+    date == "x2020_mai" ~ dmy(15052020),
+    date == "x2020_jun" ~ dmy(15062020),
+    date == "x2020_jul" ~ dmy(15072020),
+    date == "x2020_ago" ~ dmy(15082020),
+    date == "x2020_set" ~ dmy(15092020),
+    date == "x2020_out" ~ dmy(15102020)),
+    city_name = trimws(str_extract("110001 Alta Floresta D'Oeste", "\\s.*"),"l"),
+    code = as.numeric(str_extract(municipio, "(\\d{6})"))) %>% 
+  select(code, city_name, date, beds)
+  
+skim(brazil_hospital_beds)
 
 brazil_gdp_location <- brazil_gdp_location %>% 
   janitor::clean_names() %>% 
@@ -71,6 +95,10 @@ brazil_gdp_location <- brazil_gdp_location %>%
 brazil_city_coordinates <- brazil_city_coordinates %>% 
   mutate(city_code = as.numeric(substr(city_code, 1, 6)))
 
+#DELETE
+#brazil_gdp %>% filter(str_detect(nome,"ana"))
+#brazil_cities %>% filter(str_detect(name,"Sant'Ana"))
+
 #Cleaning the population db
 brazil_population <- brazil_population %>% 
   janitor::clean_names() %>% 
@@ -110,13 +138,20 @@ brazil_gdp <-
   #removing last digit from the city code
   mutate(city_code = as.integer(substr(city_code, 1, nchar(city_code)-1)))
 
+brazil_hospital_beds$merge_date=format(as.Date(brazil_hospital_beds$date), "%Y-%m")
+brazil_cities$merge_date=format(as.Date(brazil_cities$date), "%Y-%m")
+
+brazil_hospital_beds <- brazil_hospital_beds %>% select(-date, -city_name) #remove uneccessary columns
 
 #Joining databases (coordinates and population)
 brazil_cities <- brazil_cities %>% 
   left_join(brazil_city_coordinates, by = c("code" = "city_code")) %>% 
   left_join(brazil_population,by = c("code" = "city_code")) %>% 
   left_join(brazil_gdp,by = c("code" = "city_code")) %>% 
-  left_join(brazil_gdp_location,by = c("name" = "city_name"))
+  left_join(brazil_gdp_location,by = c("name" = "city_name")) %>% 
+  left_join(brazil_hospital_beds, by = c("code", "merge_date")) %>% 
+  select(-merge_date) #Remove the date used for merging
+  
 
 #Creating daily_new_cases and cases_per_100k
 brazil_cities <- brazil_cities %>% 
@@ -124,33 +159,55 @@ brazil_cities <- brazil_cities %>%
   group_by(code) %>% 
   mutate(daily_new_cases = cases - lag(cases),
          weekly_new_cases = cases - lag(cases, k=7),
+         daily_cases_per_100k = (daily_new_cases / population) * 100000,
          weekly_cases_per_100k = (weekly_new_cases / population) * 100000)
 
 #Creating daily_new_deaths and deaths_per_100k
 brazil_cities <- brazil_cities %>% 
-  arrange(code, date) %>% 
-  group_by(code) %>% 
   mutate(daily_new_deaths = deaths - lag(deaths),
+         daily_deaths_per_100k = (daily_new_deaths / population) * 100000,
+         daily_mortality_rate = case_when(
+           daily_new_cases == 0 ~0,
+           TRUE ~ daily_new_deaths / daily_new_cases),
+         daily_mortality_rate_per_100k = case_when(
+           weekly_cases_per_100k == 0 ~ 0,
+           TRUE ~ daily_deaths_per_100k / weekly_cases_per_100k),
          weekly_new_deaths = deaths - lag(deaths, k=7),
-         weekly_deaths_per_100k = (weekly_new_deaths / population) * 100000)
+         weekly_deaths_per_100k = (weekly_new_deaths / population) * 100000,
+         weekly_mortality_rate = case_when(
+           weekly_new_cases == 0 ~ 0,
+           TRUE ~ weekly_new_deaths / weekly_new_cases),
+         weekly_mortality_rate_per_100k = case_when(
+           weekly_cases_per_100k == 0 ~ 0,
+           TRUE ~ weekly_deaths_per_100k / weekly_cases_per_100k))
 
 #Creating daily_new_deaths and deaths_per_100k
 brazil_cities <- brazil_cities %>% 
-  arrange(code, date) %>% 
-  group_by(code) %>% 
   mutate(active_infections = cases - lag(cases,14),
          recovered_infections = lag(cases,14) - deaths)
 
+#Creating beds_per_100k
+brazil_cities <- brazil_cities %>% 
+  mutate(beds_per_100k = (beds / population * 100000))
 
-#write.csv(brazil_cities,"brazil_cities_lat_long.csv")
+#Covid ICU rate of 5% (https://jamanetwork.com/journals/jama/fullarticle/2763188)
+
+#Number of ICU beds required
+brazil_cities <- brazil_cities %>%
+  group_by(code, date) %>% 
+  mutate(icu_capacity = (active_infections * 0.05)/beds)
+
+
+
+write.csv(brazil_cities,"brazil_cities_lat_long.csv")
 ```
 
 ```{r}
 
 analysis_1 <- brazil_cities %>% 
-  drop_na(weekly_cases_per_100k) %>% 
+  drop_na(cases_per_100k) %>% 
   group_by(name) %>% 
-  summarise(max_cases_per_100k = max(weekly_cases_per_100k), population = mean(population), capital = mean(capital)) %>% 
+  summarise(max_cases_per_100k = max(cases_per_100k), population = mean(population), capital = mean(capital)) %>% 
   mutate(capital = as.logical(capital))
 
 analysis_1 %>% 
@@ -163,18 +220,31 @@ analysis_1 %>%
 
 ```{r}
 library(zoo)
-ggplot(brazil_cities) + geom_boxplot(aes(x=max_class, y=weekly_cases_per_100k), alpha=0.02)
+ggplot(brazil_cities) + geom_boxplot(aes(x=max_class, y=cases_per_100k), alpha=0.02)
 
 classes_over_time <- brazil_cities %>% 
-  drop_na(weekly_cases_per_100k, max_class) %>% 
-  select(max_class, weekly_cases_per_100k, date) %>% 
+  drop_na(cases_per_100k, max_class) %>% 
+  select(max_class, cases_per_100k, date) %>% 
   group_by(date, max_class) %>% 
-  summarise(avg_cases_100k = mean(weekly_cases_per_100k)) %>% 
+  summarise(avg_cases_100k = mean(cases_per_100k)) %>% 
   mutate(roll_mean_cases_100k = rollmean(avg_cases_100k, k=6, na.pad = T))
   
   
 
 ggplot(classes_over_time, aes(x=date,y=avg_cases_100k)) + geom_line()
 ```
+```{r}
+daily_data <- brazil_cities %>% 
+  group_by(date) %>% 
+  summarise(recovered = sum(recovered_infections), active_cases = sum(active_infections), cum_cases = sum(cases))
+
+ggplot(daily_data, aes(x=date, y=cum_cases)) + 
+  geom_line(color="red") +
+  geom_line(aes(x=date, y=recovered),color="green")
+
+ggplot(daily_data, aes(x=date, y=active_cases)) + 
+  geom_line(color="red")
+```
+
 
 
