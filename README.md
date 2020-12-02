@@ -6,9 +6,7 @@ Coronavirus Disease 2019(COVID-19) has caused an unprecedented threat to people�
 
 ## Objectives
 
-1.	We aim to thoroughly understand and visualize Brazil’s COVID cases evolution in multiple dimensions: chronologic, geographic and demographic, to explore different pandemic modes in different regions, ethnicity groups and periods.
-2.	We also aim to compare COVID evolution in Brazil with other disease as Dengue, etc. What are the different attributes such as infected population, severity and etc. for different diseases?
-3.	If we still have time, we also want to compare Brazil with Germany, to analyze pandemic evolution models and reactions in two representative countries in two continents.
+We aim to thoroughly understand and visualize Brazil’s COVID cases evolution in multiple dimensions: chronologic, geographic and demographic, to explore different pandemic modes in different regions, ethnicity groups and periods.
 
 ## Datasets
 1.	https://www.kaggle.com/unanimad/corona-virus-brazil
