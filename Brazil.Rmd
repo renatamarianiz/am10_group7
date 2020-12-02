@@ -17,6 +17,9 @@ library(vroom)
 library(stringr)
 library(openxlsx)
 library(lubridate)
+library(tidyverse)
+library(Publish)
+library(data.table)
 ```
 
 
@@ -29,7 +32,8 @@ brazil_city_coordinates <- vroom("data/brazil_cities_coordinates.csv")
 brazil_population <- vroom(file = "data/pop_by_city.csv")
 brazil_gdp <- vroom("data/PIB dos Munic¡pios - base de dados 2010-2017.csv")
 brazil_gdp_location <- read.xlsx(xlsxFile = "data/brazil_gdp_city.xlsx", fillMergedCells = TRUE, colNames = TRUE) 
-brazil_hospital_beds <- vroom(file = "data/Itensive_Care Beds_Brazil_2020.csv", delim=';')
+brazil_hospital_beds <- vroom(file = "data/Itensive_Care Beds_Brazil_2020.csv",
+                                    delim=';')
 
 brazil_hospital_beds <- brazil_hospital_beds %>% 
   janitor::clean_names() %>% 
@@ -202,13 +206,99 @@ brazil_cities <- brazil_cities %>%
 write.csv(brazil_cities,"brazil_cities_lat_long.csv")
 ```
 
+
 ```{r}
 
-analysis_1 <- brazil_cities %>% 
-  drop_na(cases_per_100k) %>% 
-  group_by(name) %>% 
-  summarise(max_cases_per_100k = max(cases_per_100k), population = mean(population), capital = mean(capital)) %>% 
-  mutate(capital = as.logical(capital))
+brazil_cities <- brazil_cities %>% mutate(daily_new_cases = ifelse(is.na(daily_new_cases),0 , daily_new_cases))
+
+
+
+brazil_cities_region <- brazil_cities %>%
+  arrange(region, date) %>% 
+  group_by(region,date) %>%
+  summarise(daily_cases_region= sum(daily_new_cases)) %>% 
+  mutate(cumsum= cumsum(daily_cases_region))%>% 
+  mutate(region_days_since_10000_cases = ifelse (cumsum < 10000,0,1))%>% 
+  mutate(region_days_since_10000_cases = ifelse (cumsum< 10000,0, cumsum(region_days_since_10000_cases) )) 
+
+brazil_cities_type <- brazil_cities %>%
+  arrange(city_type, date) %>% 
+  group_by(city_type,date) %>%
+  summarise(daily_cases_region= sum(daily_new_cases)) %>% 
+  mutate(cumsum= cumsum(daily_cases_region))%>% 
+  mutate(region_days_since_10000_cases = ifelse (cumsum < 10000,0,1))%>% 
+  mutate(region_days_since_10000_cases = ifelse (cumsum< 10000,0, cumsum(region_days_since_10000_cases) )) 
+
+brazil_cities_states <- brazil_cities %>%
+  arrange(state, date) %>% 
+  group_by(state,date) %>%
+  summarise(daily_cases_region= sum(daily_new_cases)) %>% 
+  mutate(cumsum= cumsum(daily_cases_region))%>% 
+  mutate(region_days_since_10000_cases = ifelse (cumsum < 10000,0,1))%>% 
+  mutate(region_days_since_10000_cases = ifelse (cumsum< 10000,0, cumsum(region_days_since_10000_cases) ))
+ 
+
+brazil_cities <- brazil_cities %>% mutate(population = ifelse(is.na(daily_new_cases), 0 , population))
+
+brazil_cities_gdp <- brazil_cities
+
+
+
+brazil_cities_gdp <- brazil_cities_gdp %>% 
+  mutate(gdp_group = case_when(
+    gdp_per_capita <= 10000 ~ 1,
+    gdp_per_capita <= 20000 ~ 2,
+    gdp_per_capita <= 30000 ~ 3,
+    gdp_per_capita <= 40000 ~ 4,
+    gdp_per_capita >= 40000 ~ 5
+  ))
+
+brazil_cities_gdp_2 <- brazil_cities_gdp
+
+brazil_cities_gdp <- brazil_cities_gdp %>%
+  arrange(gdp_group, date) %>% 
+  group_by(gdp_group,date) %>%
+  summarise(daily_cases_region= sum(daily_new_cases)) %>% 
+  mutate(cumsum= cumsum(daily_cases_region))%>% 
+  mutate(region_days_since_10000_cases = ifelse (cumsum < 10000,0,1))%>% 
+  mutate(region_days_since_10000_cases = ifelse (cumsum< 10000,0, cumsum(region_days_since_10000_cases) ))
+
+
+brazil_cities_gdp_2 <- brazil_cities_gdp_2 %>%
+  arrange(gdp_group, date) %>% 
+  group_by(gdp_group,date) %>%
+  summarise(daily_cases_region= sum(daily_new_cases), population=sum(population)) %>% 
+  mutate(cumsum_by_m= cumsum(daily_cases_region)/population)%>% 
+  mutate(cumsum= cumsum(daily_cases_region)) %>%
+  mutate(region_days_since_10000_cases = ifelse (cumsum < 10000,0,1))%>% 
+  mutate(region_days_since_10000_cases = ifelse (cumsum< 10000,0, cumsum(region_days_since_10000_cases) ))
+
+
+write.csv(brazil_cities_region,"brazil_cities_region.csv")
+write.csv(brazil_cities_states,"brazil_cities_states.csv")
+write.csv(brazil_cities_type, "brazil_cities_type.csv")
+write.csv(brazil_cities_gdp, "brazil_cities_gdp.csv")
+ 
+
+```
+
+```{r}
+ggplot(brazil_cities_region, aes(x= region_days_since_10000_cases, y= cumsum, color=region))+ geom_point()
+
+ggplot(brazil_cities_type, aes(x= region_days_since_10000_cases, y= cumsum, color=city_type))+ geom_point()
+
+ggplot(brazil_cities_states, aes(x= region_days_since_10000_cases, y= cumsum, color=state))+ geom_point()
+
+ggplot(brazil_cities_gdp, aes(x= region_days_since_10000_cases, y= cumsum, color=gdp_group))+ geom_point()
+
+
+ggplot(brazil_cities_gdp_2, aes(x= region_days_since_10000_cases, y= cumsum_by_m, color=gdp_group))+ geom_point()
+
+```
+
+```{r}
+
+
 
 analysis_1 %>% 
   filter(capital == TRUE) %>% 
@@ -233,18 +323,3 @@ classes_over_time <- brazil_cities %>%
 
 ggplot(classes_over_time, aes(x=date,y=avg_cases_100k)) + geom_line()
 ```
-```{r}
-daily_data <- brazil_cities %>% 
-  group_by(date) %>% 
-  summarise(recovered = sum(recovered_infections), active_cases = sum(active_infections), cum_cases = sum(cases))
-
-ggplot(daily_data, aes(x=date, y=cum_cases)) + 
-  geom_line(color="red") +
-  geom_line(aes(x=date, y=recovered),color="green")
-
-ggplot(daily_data, aes(x=date, y=active_cases)) + 
-  geom_line(color="red")
-```
-
-
-
