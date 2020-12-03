@@ -124,7 +124,7 @@ max_classes <-
   group_by(city_name) %>% 
   arrange(desc(statistic)) %>% 
   drop_na(statistic) %>% 
-  summarize(statistic=max(statistic))
+  summarise(statistic=max(statistic))
 
 #Adding the city name to the previous df
 max_classes_with_name <- max_classes  %>% 
@@ -307,13 +307,19 @@ brazil_cities <- vroom("/Users/remzanella/Desktop/brazil_cities_lat_long.csv")
 #we'll use the latest day of cases data to predict the future cases, if not we couldn't run a clustering analysis, it says that "vector size is 14.6G.
 filtered_data <- 
   brazil_cities %>%
-  filter(date == mdy("11/25/2020")) %>% 
-  filter(daily_new_cases!=0 & daily_mortality_rate!=0 & daily_new_deaths!=0 )
+  filter(date >= mdy("11/01/2020")) %>%
+  group_by(city_name) %>% 
+  summarise(daily_new_cases = mean(daily_new_cases),
+            daily_new_deaths = mean(daily_new_deaths),
+            population = mean(population),
+            gdp = mean(gdp),
+            daily_mortality_rate = mean(daily_mortality_rate)) %>% 
+  filter(daily_new_cases!=0 & daily_mortality_rate!=0 & daily_new_deaths!=0 ) %>% 
+  drop_na()
 
 cluster_data <- 
   filtered_data %>% 
   select(daily_new_cases,daily_new_deaths,population,gdp, daily_mortality_rate) %>%
-  drop_na() %>% 
   scale()
 
 # we'll use elbow method to find the best number of cluster 
@@ -337,7 +343,7 @@ ggplot(elbow_df, aes(x = k, y = tot_withinss)) +
 fviz_nbclust(cluster_data,kmeans, method = "wss")+
   labs(subtitle = "Elbow method")
 
-# from the plot below we decide to use 4 clusters 
+# from the plot below we decide to use 5 clusters 
 
 ```
 
@@ -351,13 +357,32 @@ model_km$size
 xa<-data.frame(cluster=as.factor(c(1:4)),model_km$centers)
 xa2k3<-xa %>% gather(variable,value,-cluster,factor_key = TRUE)
 
-graphknn<-ggplot(xa2k3, aes(x = variable, y = value))+  geom_line(aes(color =cluster,group = cluster), linetype = "dashed",size=1)+ geom_point(size=1,shape=4)+geom_hline(yintercept=0)+theme(text = element_text(size=10),
-        axis.text.x = element_text(angle=45, hjust=1),legend.title=element_text(size=5),legend.text = element_text(size=5))+ggtitle("K-means Centers k=4")
-
+graphknn<-
+  ggplot(xa2k3, aes(x = variable, y = value)) + 
+  geom_hline(yintercept=0, color = "lightgrey") +
+  geom_line(aes(color =cluster,group = cluster), linetype = "dashed",size=1) +
+  geom_point(size=1,shape=4) +
+  theme_minimal() +
+  theme(text = element_text(size=9),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.x = element_text(angle=45, hjust=1),
+        legend.title=element_text(size=7),
+        legend.text = element_text(size=7),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        plot.title = element_text(size = 12),
+        plot.subtitle = element_text(size = 10, face = "italic")) +
+  labs(title= "Cluster 4 Focuses on Highly Impacted Regions",
+       subtitle = "K-means Kluster Algorithm with 4 Clusters") +
+  scale_color_manual(values=c("#B7D5ED", "#80B3D8","#F6C993","#D27532")) +
+  scale_x_discrete(labels=c("daily_new_cases" = "Daily Cases", 
+                            "daily_new_deaths" = "Daily Deaths",
+                            "population" = "Population",
+                            "gdp" = "GDP",
+                            "daily_mortality_rate" = "Daily Mortality Rate"))
 
 graphknn
-
-
 ```
 
 
@@ -383,7 +408,6 @@ grid.arrange(p1, p2,p3, nrow = 2)
 ```{r}
 
 filtered_data$Cluster <- model_km4$cluster
-
 write.csv(filtered_data,"/Users/remzanella/Desktop/cluster_test.csv")
 
 ```
