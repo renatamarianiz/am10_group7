@@ -19,8 +19,8 @@ We aim to thoroughly understand and visualize Brazil’s COVID cases evolution i
 
 ## Description of Story
 
--Is it not an alarming situation by "John Bolsonaro". 
--Eight months later Brasil is the third countries in terms of COVID cases and the second one in term of COVID deaths, but how do brazil arrive to this alarming situtaion? 
+- It is not an alarming situation by "John Bolsonaro". 
+- Eight months later Brasil is the third countries in terms of COVID cases and the second one in term of COVID deaths, but how do brazil arrive to this alarming situtaion? 
 - Beginning: north west of Brazil and around the south coast, in less than 2 month( 3rd april to 22 april) may some "region" with low population from the northest  end up with more than 3000 cases per 100k, 2 months later the virus has spread around all the country, mainly present in the south shore cities
 - Continue our analysis: we observe a clear difference between the south and the north. north: more cases by 100k but less death, south: less cases but much more deaths, but south cities have much more gdp and population.
 Important trend notice the almost perfect correlation between cases and deaths, intriguant? 
