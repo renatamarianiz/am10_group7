@@ -18,6 +18,21 @@ We aim to thoroughly understand and visualize Brazil’s COVID cases evolution i
 
 ## Description of Story
 
+-Is it not an alarming situation by "John Bolsonaro". 
+-XXX month later Brasil is the third countries in terms of COVID cases and the second one in term of COVID deaths, but How do brazil arrive to this alarming situtaion? 
+-Beginning: north west of Brazil and around the south coast, in less than 2 month( 3rd april to 22 april) may some "region" with low population from the northest  end up with more than 3000 cases per 100k, 2 month later the virus has spread around all the country, mainly present in the south shore city
+-Continue our analysis: we observe a clear difference between the south and the north. north: more cases by 100k but less death, south: less cases but much more deaths, but gdp and population 
+Important trend notice the almost perfect correlation between cases and deaths, intriguant? 
+slide 5: what is the date? cause interpretion of the slide on state will change.
+- Get dipper into this and try to understand how each state is performing in terms of cases absolute cases, SP curve is higher for any value of x --> probably mainly due to population , but that still does not explain the high death cases
+-Focus on Sao Paulo: we can see that the mortality rate is higher in the coastal zone, the one of the metropole where are most of the population concentrated and the richer, Still don't explain the differnce between mortality per k and cases per k, but explain a bit better where the mortality per k is higher
+Slide 9 uniquely in sao Paulo? 
+-beginning no test:no cases but high death, start introducing test: high case but low death, More cases means the virus spread fatser? More cases and more deaths means that the virus has evolved in a less virulent way?  more detected cases not neccesarilly means more cases, deaths might have lowered even if cases were higher because active cases might decrease, or testing might have permit to allow people to know if they are infected and then not transfer them to susceptible/weak people.
+-Preferntial treatment for capital: begining capital has more test and less death -->parallel with the last point differnces between actuel cases and detected cases. Is it due to the fact that people in the capital are socially more valuable for the governement?  Explain first graph about the spread in covid in the north?
+-effect of lockdown, cases higher even after highlit the differnce between actual cases and tested cases+ incubation period, deaths explains by the same phenomena of incubation
+-Clustering
+
+
 
 
 ## Datasets
