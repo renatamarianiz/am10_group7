@@ -37,8 +37,8 @@ Slide 9 uniquely in sao Paulo?
 
 ## Datasets
 1.	https://www.kaggle.com/unanimad/corona-virus-brazil	
-2.	https://www.tycho.pitt.edu/dataset/BR.38362002/
-3.	https://www.kaggle.com/imdevskp/covid-19-analysis-visualization-comparisons
-4.  https://www.ibge.gov.br/geociencias/organizacao-do-territorio/15774-malhas.html?=&t=acesso-ao-produto
-5. 
-*Datasets will be updated as we go.
+2.  https://www.ibge.gov.br/geociencias/organizacao-do-territorio/15774-malhas.html?=&t=acesso-ao-produto
+3.  https://www.ibge.gov.br/estatisticas/sociais/populacao/9103-estimativas-de-populacao.html?=&t=resultados
+4.  https://www.ibge.gov.br/estatisticas/economicas/contas-nacionais/9088-produto-interno-bruto-dos-municipios.html?=&t=downloads
+5.  https://sidra.ibge.gov.br/Tabela/3563
+6.  http://tabnet.datasus.gov.br/cgi/deftohtm.exe?cnes/cnv/leiintbr.def
