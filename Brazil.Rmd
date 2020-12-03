@@ -347,6 +347,7 @@ fviz_nbclust(cluster_data,kmeans, method = "wss")+
 
 # from the plot below we decide to use 5 clusters 
 
+
 ```
 
 ```{r}
