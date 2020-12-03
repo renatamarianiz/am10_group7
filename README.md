@@ -37,6 +37,8 @@ When the testing rate scaled up and hence more cases detected, Brazilian governm
 
 Finally, we used a machine learning algorithm based on k-means to divide the cities in Brazil into clusters, trying to categorize them based on their COVID-19 and demographic statistics. Clusters 3 and 4 represent cities that still have a high number of cases and deaths, but a low mortality rate. Cities in cluster 4 are specifically Rio and São Paulo, highly populated and dense cities. On the other hand, group 3 consists of medium sized cities, maily capitals of states, that are spread throughout the country. Clusters 1 and 2 consist of small towns, with low daily cases and deaths. However, cluster 2 shows a higher mortality rate than 1.
 
+Concludingly we believe that the regional differences in testing capacity, along with the missing data points made it difficult to precisely draw conclusions on the main influencers covid of spread throughout Brazil. Nevertheless, throughout our analysis, we have been able to show that both population size, as well as city type (density) had a significant effect on the mortality rate within cities. However, more in depth data would be required in order to trace this effect back in a more significant fashion. Interestingly, we also discovered one possible cause for the highly differing mortality rates throughout Brazil's states, believing that the high variability in testing availability is responsible for this.
+
 ## Datasets
 1.	https://www.kaggle.com/unanimad/corona-virus-brazil	
 2.  https://www.ibge.gov.br/geociencias/organizacao-do-territorio/15774-malhas.html?=&t=acesso-ao-produto
