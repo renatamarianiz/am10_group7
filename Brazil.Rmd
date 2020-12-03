@@ -10,7 +10,25 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-#Importing Libraries
+#Installing & checking Libraries
+if(!is.element("tidyverse", installed.packages()[,1]))
+{  install.packages("tidyverse")}
+if(!is.element("cluster", installed.packages()[,1]))
+{  install.packages("cluster")}
+if(!is.element("factoextra", installed.packages()[,1]))
+{  install.packages("factoextra")}
+if(!is.element("Hmisc", installed.packages()[,1]))
+{  install.packages("Hmisc")}
+require(tidyverse)
+require(Hmisc)
+require(digest)
+require(cluster)    # clustering algorithms
+require(factoextra) # an umbrealla library for clustering algorithms & visualizations
+
+#Importing libraries
+library(sf)
+library(extrafont)
+loadfonts(device = "pdf")
 library(tidyverse)
 library(dplyr)
 library(skimr)
@@ -21,28 +39,10 @@ library(lubridate)
 library(tidyverse)
 library(Publish)
 library(data.table)
-if(!is.element("tidyverse", installed.packages()[,1]))
-{  install.packages("tidyverse")}
-if(!is.element("cluster", installed.packages()[,1]))
-{  install.packages("cluster")}
-if(!is.element("factoextra", installed.packages()[,1]))
-{  install.packages("factoextra")}
-if(!is.element("Hmisc", installed.packages()[,1]))
-{  install.packages("Hmisc")}
-
-require(tidyverse)
-require(Hmisc)
-require(digest)
-require(cluster)    # clustering algorithms
-require(factoextra) # an umbrealla library for clustering algorithms & visualizations
-library(sf)
-library(extrafont)
-loadfonts(device = "pdf")
 ```
 
 
 ```{r}
-
 ## Importing Data
 brazil_covid19 <- vroom("data/brazil_covid19.csv") #Covid Information
 brazil_cities <- vroom("data/brazil_covid19_cities.csv") #City Information
@@ -51,7 +51,6 @@ brazil_population <- vroom(file = "data/pop_by_city.csv") #Population Informatio
 brazil_gdp <- vroom("data/PIB dos Munic¡pios - base de dados 2010-2017.csv") #GDP Information
 brazil_gdp_location <- read.xlsx(xlsxFile = "data/brazil_gdp_city.xlsx", fillMergedCells = TRUE, colNames = TRUE) #Income info
 brazil_hospital_beds <- vroom(file = "data/Itensive_Care Beds_Brazil_2020.csv", delim=';') #Number of hospital beds
-
 ```
 
 ```{r}
@@ -60,10 +59,10 @@ brazil_hospital_beds <-
   brazil_hospital_beds %>% 
   #cleaning column names
   janitor::clean_names() %>% 
-  #transforming date as numeric
+  #transforming previously char. date to numeric
   mutate(x2020_jul = as.numeric(x2020_jul),
          x2020_ago = as.numeric(x2020_ago)) %>% 
-  #pivoting the dataframe
+  #pivoting the data-frame into a long-format
   pivot_longer(!municipio,names_to = "date",values_to = "beds") %>% 
   #mutating the dates - transforming to a date
   mutate(date = case_when(
@@ -79,13 +78,10 @@ brazil_hospital_beds <-
     date == "x2020_out" ~ dmy(15102020)),
     #Fixing the city name for Alta Floresta D'Oeste
     city_name = trimws(str_extract("110001 Alta Floresta D'Oeste", "\\s.*"),"l"),
-    #Fix code
+    #Seperate the code from the city name found within the municipio
     code = as.numeric(str_extract(municipio, "(\\d{6})"))) %>% 
-  #Selecting the Columns that we want
+  #Selecting the column of interest (beds), as well as those required for a merge (code, date)
   select(code, city_name, date, beds)
-
-#checking if everything was performed
-skim(brazil_hospital_beds)
 ```
 
 
@@ -94,14 +90,16 @@ skim(brazil_hospital_beds)
 brazil_gdp_location <- brazil_gdp_location %>% 
   #cleaning column names
   janitor::clean_names() %>% 
-  #renaming columns
+  #renaming columns to match english names
   rename(
     city_name = municipio,
-    class = classes_de_rendimento_nominal_mensal_domiciliar_per_capita,
-    statistic = ano_x_situacao_do_domicilio
+    class = classes_de_rendimento_nominal_mensal_domiciliar_per_capita, #income class
+    statistic = ano_x_situacao_do_domicilio #percentage of population in this income class
     ) %>% 
   #filtering and mutating income classes (compared to the base salary in Brazil)
   filter(class != "Total") %>% 
+  #Renaming income classes to more intuitive names
+  #All percentages are percentage of population living of that percentage of base salary
   mutate(class = case_when(
     class == "Total" ~ "Total",
     class == "Até 1/8 de salário mínimo" ~ "below_0.125",
@@ -114,21 +112,23 @@ brazil_gdp_location <- brazil_gdp_location %>%
     class == "Mais de 5 a 10 salários mínimos" ~ "between_5_10",
     class == "Mais de 10 salários mínimos" ~ "more_than_10",
     TRUE ~ class),
-    #Fixing the city names
+    #Fixing the city names by removing state codes
     city_name = str_remove(city_name, " \\([A-Z]{2}\\)")) %>% 
   mutate(statistic = round(as.numeric(statistic),2)) %>% 
-  #taking out the class with no income
+  #Removing the class with no income as this contains mainly NAs
   filter(class != "Sem rendimento", class != "Fonte: IBGE - Censo Demográfico") 
 
-#dataframe with the biggest income class per city (income class in %)
+
+#creating a Dataframe with the modal income class for every city (income class in %)
 max_classes <- 
   brazil_gdp_location %>% 
   group_by(city_name) %>% 
   arrange(desc(statistic)) %>% 
   drop_na(statistic) %>% 
+  #finding the maximum percentage per each city
   summarise(statistic=max(statistic))
 
-#Adding the city name to the previous df
+#Adding the city_names to the max_class dataframe containing maximum percentage for each city
 max_classes_with_name <- max_classes  %>% 
   left_join(brazil_gdp_location, by=c("city_name", "statistic")) %>% 
   mutate(max_class = class) %>% 
@@ -138,17 +138,16 @@ max_classes_with_name <- max_classes  %>%
 brazil_gdp_location <- 
   brazil_gdp_location %>% 
   left_join(max_classes_with_name, by="city_name") %>% 
+  #pivoting wider to have one column for each income class, this is important to have one row per city & day later
   pivot_wider(names_from = class, values_from = statistic,values_fn = {mean})
-
 ```
 
 ```{r}
-
 #Cleaning the city coordinates file - fixing the city codes
 brazil_city_coordinates <- 
   brazil_city_coordinates %>% 
+  #removing the last figure from coordinates as this is not included in other zip-code formats
   mutate(city_code = as.numeric(substr(city_code, 1, 6)))
-
 ```
 
 
@@ -176,7 +175,7 @@ brazil_gdp <-
   filter(Ano == 2017) %>%
   #cleaning col names
   janitor::clean_names() %>% 
-  #selecting columns
+  #selecting columns of interest, see below for english names
   select(c(nome_da_grande_regiao,
            codigo_do_municipio,
            nome_do_municipio,
@@ -185,7 +184,7 @@ brazil_gdp <-
            produto_interno_bruto_per_capita_a_precos_correntes_r_1_00,
            atividade_com_maior_valor_adicionado_bruto
            )) %>% 
-  #renaming columns
+  #renaming columns to english names
   rename(region = nome_da_grande_regiao,
          city_code = codigo_do_municipio,
          city = nome_do_municipio,
@@ -193,10 +192,10 @@ brazil_gdp <-
          gdp = produto_interno_bruto_a_precos_correntes_r_1_000,
          gdp_per_capita = produto_interno_bruto_per_capita_a_precos_correntes_r_1_00,
          main_activity = atividade_com_maior_valor_adicionado_bruto) %>% 
-  #replacing decimal and thousand separators
+  #replacing decimal and thousand separators as portugese use comma instead of .
   mutate(gdp = sapply(gdp, function(v) {as.numeric(gsub("\\,","", as.character(v)))}),
          gdp_per_capita = sapply(gdp_per_capita, function(v) {as.numeric(gsub("\\,","", as.character(v)))})) %>% 
-  #removing last digit from the city code
+  #removing last digit from the city code to match normed format
   mutate(city_code = as.integer(substr(city_code, 1, nchar(city_code)-1)))
 ```
 
@@ -204,13 +203,14 @@ brazil_gdp <-
 #Joning dataframes
 
 #Formating date columns that will be used as merge criteria
+#As these data-points are on a per-month basis we added a separate column for matching purposes
 brazil_hospital_beds$merge_date=format(as.Date(brazil_hospital_beds$date), "%Y-%m")
 brazil_cities$merge_date=format(as.Date(brazil_cities$date), "%Y-%m")
 
-#Remove uneccessary columns
+#Remove column used for merging as this has no more need
 brazil_hospital_beds <- brazil_hospital_beds %>% select(-date, -city_name)
 
-#Joining all cleaned databases
+#Joining all cleaned databases 
 brazil_cities <- 
   brazil_cities %>% 
   left_join(brazil_city_coordinates, by = c("code" = "city_code")) %>% 
@@ -219,14 +219,10 @@ brazil_cities <-
   left_join(brazil_gdp_location,by = c("name" = "city_name")) %>% 
   left_join(brazil_hospital_beds, by = c("code", "merge_date")) %>% 
   select(-merge_date) #Remove the date used for merging
-
-
 ```
 
 ```{r}
-
 #Creating and mutating new variables
-
 #Creating daily_new_cases and cases_per_100k
 brazil_cities <- brazil_cities %>% 
   arrange(code, date) %>% 
@@ -240,17 +236,21 @@ brazil_cities <- brazil_cities %>%
 brazil_cities <- brazil_cities %>% 
   mutate(daily_new_deaths = deaths - lag(deaths),
          daily_deaths_per_100k = (daily_new_deaths / population) * 100000,
+         #preventing division by zero issues
          daily_mortality_rate = case_when(
            daily_new_cases == 0 ~0,
            TRUE ~ daily_new_deaths / daily_new_cases),
+         #preventing division by zero issues
          daily_mortality_rate_per_100k = case_when(
            weekly_cases_per_100k == 0 ~ 0,
            TRUE ~ daily_deaths_per_100k / weekly_cases_per_100k),
          weekly_new_deaths = deaths - lag(deaths, k=7),
          weekly_deaths_per_100k = (weekly_new_deaths / population) * 100000,
+         #preventing division by zero issues
          weekly_mortality_rate = case_when(
            weekly_new_cases == 0 ~ 0,
            TRUE ~ weekly_new_deaths / weekly_new_cases),
+         #preventing division by zero issues
          weekly_mortality_rate_per_100k = case_when(
            weekly_cases_per_100k == 0 ~ 0,
            TRUE ~ weekly_deaths_per_100k / weekly_cases_per_100k))
@@ -265,23 +265,19 @@ brazil_cities <- brazil_cities %>%
   mutate(beds_per_100k = (beds / population * 100000))
 
 #Covid ICU rate of 5% (https://jamanetwork.com/journals/jama/fullarticle/2763188)
-
-#Number of ICU beds required
+#Number of ICU beds required based upon a ICU-rate of 5%
 brazil_cities <- brazil_cities %>%
   group_by(code, date) %>% 
   mutate(icu_capacity = (active_infections * 0.05)/beds)
 ```
 
 ```{r}
-
 #Saving it in a CSV that will be used in Tableau for the visualizations
 write.csv(brazil_cities,"brazil_cities_lat_long.csv")
-
 ```
 
 
 ```{r}
-
 #Replacing NA's by 0 in the previous df
 brazil_cities <- brazil_cities %>% mutate(daily_new_cases = ifelse(is.na(daily_new_cases),0 , daily_new_cases))
 brazil_cities <- brazil_cities %>% mutate(population = ifelse(is.na(daily_new_cases), 0 , population))
@@ -292,23 +288,25 @@ brazil_cities_states <- brazil_cities %>%
   group_by(state,date) %>%
   summarise(daily_cases_region= sum(daily_new_cases)) %>% 
   mutate(cumsum= cumsum(daily_cases_region))%>% 
+  #create binary variable indicating whether cases reached over 10k
   mutate(region_days_since_10000_cases = ifelse (cumsum < 10000,0,1))%>% 
+  #count cumulative days since first occurrence of 10k cases
   mutate(region_days_since_10000_cases = ifelse (cumsum< 10000,0, cumsum(region_days_since_10000_cases) ))
-
 
 #Saving all new dfs into csv's so it is possible to import to tableau
 write.csv(brazil_cities_states,"brazil_cities_states.csv")
-
 ```
 
 # Cluster Analysis
 ```{r}
 brazil_cities <- vroom("/Users/remzanella/Desktop/brazil_cities_lat_long.csv")
 
-#linear regression analysis 
-#we'll use the latest day of cases data to predict the future cases, if not we couldn't run a clustering analysis, it says that "vector size is 14.6G.
+#Running a cluster analysis to detect clusters in regional Covid outbreaks
+
+#Creating a new, more compact, dataframe to be used for clustering
 filtered_data <- 
   brazil_cities %>%
+  #running only on all available cases in this November
   filter(date >= mdy("11/01/2020")) %>%
   group_by(city_name) %>% 
   summarise(daily_new_cases = mean(daily_new_cases),
@@ -317,15 +315,15 @@ filtered_data <-
             gdp = mean(gdp),
             daily_mortality_rate = mean(daily_mortality_rate)) %>% 
   filter(daily_new_cases!=0 & daily_mortality_rate!=0 & daily_new_deaths!=0 ) %>% 
-  drop_na()
+  drop_na() #drop all NA values
 
+#Specify columns to be used for clustering
 cluster_data <- 
   filtered_data %>% 
   select(daily_new_cases,daily_new_deaths,population,gdp, daily_mortality_rate) %>%
   scale()
 
 # we'll use elbow method to find the best number of cluster 
-
 tot_withinss <- map_dbl(1:10,  function(k){
   model <- kmeans(x = cluster_data, centers = k,iter.max = 100, nstart = 10)
   model$tot.withinss})
@@ -344,18 +342,14 @@ ggplot(elbow_df, aes(x = k, y = tot_withinss)) +
 #Here is a short way of producing the elbow chart using "fviz_nbclust" function. 
 fviz_nbclust(cluster_data,kmeans, method = "wss")+
   labs(subtitle = "Elbow method")
-
-# from the plot below we decide to use 5 clusters 
-
+# From the plot below we decide to use 4 clusters for our analysis
 ```
 
 ```{r}
-
+#Using the previously found values of k we now cluster the results
 model_km <- eclust(cluster_data, "kmeans", k = 4,nstart = 50, graph = FALSE)
-
 #Check the sizes of the clusters
 model_km$size
-
 xa<-data.frame(cluster=as.factor(c(1:4)),model_km$centers)
 xa2k3<-xa %>% gather(variable,value,-cluster,factor_key = TRUE)
 
@@ -402,14 +396,11 @@ model_km4$size
 p1 <- fviz_cluster(model_km2, geom = "point", data = cluster_data) + ggtitle("k = 2")
 p2 <- fviz_cluster(model_km3, geom = "point",  data = cluster_data) + ggtitle("k = 3")
 p3 <- fviz_cluster(model_km4, geom = "point",  data = cluster_data) + ggtitle("k = 4")
-
 library(gridExtra)
 grid.arrange(p1, p2,p3, nrow = 2)
 ```
 
 ```{r}
-
 filtered_data$Cluster <- model_km4$cluster
 write.csv(filtered_data,"/Users/remzanella/Desktop/cluster_test.csv")
-
 ```
