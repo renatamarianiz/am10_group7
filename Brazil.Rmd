@@ -27,6 +27,8 @@ require(factoextra) # an umbrealla library for clustering algorithms & visualiza
 
 #Importing libraries
 library(sf)
+library(extrafont)
+loadfonts(device = "pdf")
 library(tidyverse)
 library(dplyr)
 library(skimr)
@@ -350,22 +352,23 @@ model_km <- eclust(cluster_data, "kmeans", k = 4,nstart = 50, graph = FALSE)
 model_km$size
 xa<-data.frame(cluster=as.factor(c(1:4)),model_km$centers)
 xa2k3<-xa %>% gather(variable,value,-cluster,factor_key = TRUE)
+
 graphknn<-
   ggplot(xa2k3, aes(x = variable, y = value)) + 
   geom_hline(yintercept=0, color = "lightgrey") +
   geom_line(aes(color =cluster,group = cluster), linetype = "dashed",size=1) +
   geom_point(size=1,shape=4) +
   theme_minimal() +
-  theme(text = element_text(size=9),
+  theme(text = element_text(size=9, family = "Avenir Book"),
         axis.title.x = element_blank(),
         axis.title.y = element_blank(),
-        axis.text.x = element_text(angle=45, hjust=1),
-        legend.title=element_text(size=7),
-        legend.text = element_text(size=7),
+        axis.text.x = element_text(angle=45, hjust=1, family = "Avenir Book"),
+        legend.title=element_text(size=7, family = "Avenir Book"),
+        legend.text = element_text(size=7, family = "Avenir Book"),
         panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(),
-        plot.title = element_text(size = 12),
-        plot.subtitle = element_text(size = 10, face = "italic")) +
+        plot.title = element_text(size = 12, family = "Avenir Book"),
+        plot.subtitle = element_text(size = 10, face = "italic", family = "Avenir Book")) +
   labs(title= "Cluster 4 Focuses on Highly Impacted Regions",
        subtitle = "K-means Kluster Algorithm with 4 Clusters") +
   scale_color_manual(values=c("#B7D5ED", "#80B3D8","#F6C993","#D27532")) +
@@ -374,6 +377,7 @@ graphknn<-
                             "population" = "Population",
                             "gdp" = "GDP",
                             "daily_mortality_rate" = "Daily Mortality Rate"))
+
 graphknn
 ```
 
