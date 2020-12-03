@@ -15,7 +15,7 @@ We aim to thoroughly understand and visualize Brazil’s COVID cases evolution i
 3. Impact of demographic factors (population / gdp) on mortality rate
 4. Impact of human measures (testing capabilities / lockdown) on moratality rate
 5. In-depth analysis of Covids development in Sao Paulo
-6. Creation a clustering algorithm
+6. Creating a clustering algorithm
 
 ## Description of Story
 
@@ -41,7 +41,7 @@ Concludingly we believe that the regional differences in testing capacity, along
 
 ## Datasets
 
-Due to size of **dataset 2** it is not included in this repository and **has to be manually added**.
+Due to size of **dataset 2** it is not included in this repository and **has to be manually added**, this dataset includes geo-spatial data for over 5000 differing municipalities in Brazil.
 
 1.	https://www.kaggle.com/unanimad/corona-virus-brazil	
 2.  https://www.ibge.gov.br/geociencias/organizacao-do-territorio/15774-malhas.html?=&t=acesso-ao-produto
