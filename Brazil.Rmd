@@ -342,14 +342,8 @@ ggplot(elbow_df, aes(x = k, y = tot_withinss)) +
 #Here is a short way of producing the elbow chart using "fviz_nbclust" function. 
 fviz_nbclust(cluster_data,kmeans, method = "wss")+
   labs(subtitle = "Elbow method")
-<<<<<<< HEAD
 
-# from the plot below we decide to use 5 clusters 
-
-
-=======
 # From the plot below we decide to use 4 clusters for our analysis
->>>>>>> fb79bbeecd4d41a06080ae34aff1af607b567e47
 ```
 
 ```{r}
