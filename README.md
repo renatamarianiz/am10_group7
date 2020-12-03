@@ -40,6 +40,9 @@ Finally, we used a machine learning algorithm based on k-means to divide the cit
 Concludingly we believe that the regional differences in testing capacity, along with the missing data points made it difficult to precisely draw conclusions on the main influencers covid of spread throughout Brazil. Nevertheless, throughout our analysis, we have been able to show that both population size, as well as city type (density) had a significant effect on the mortality rate within cities. However, more in depth data would be required in order to trace this effect back in a more significant fashion. Interestingly, we also discovered one possible cause for the highly differing mortality rates throughout Brazil's states, believing that the high variability in testing availability is responsible for this.
 
 ## Datasets
+
+Due to size of **dataset 2** it is not included in this repository and **has to be manually added**.
+
 1.	https://www.kaggle.com/unanimad/corona-virus-brazil	
 2.  https://www.ibge.gov.br/geociencias/organizacao-do-territorio/15774-malhas.html?=&t=acesso-ao-produto
 3.  https://www.ibge.gov.br/estatisticas/sociais/populacao/9103-estimativas-de-populacao.html?=&t=resultados
